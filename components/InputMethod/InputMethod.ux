@@ -237,7 +237,7 @@
                 <img static src="./assets/arc/space.png" style="width: 60px;height: 60px;" @click="onBtnClick('space')" />
               </div>
             </div>
-            <div else style="left: 3px; flex-direction: column;">
+            <div if="{{numFlag && !numFlag_jp}}" style="left: 3px; flex-direction: column;">
               <div static style="margin-left: 0px;margin-top: 0px;height: 60px;">
                 <text class="calbtn66" for="{{item in keys['sign'][0]}}" @click="onSelect(item)">{{item}}</text>
               </div>
@@ -246,6 +246,17 @@
               </div>
               <div static style="margin-left: 64px;margin-top: -5px;height: 60px;">
                 <text class="calbtn66" for="{{item in keys['sign'][2]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+            </div>
+            <div if="{{numFlag_jp}}" style="left: 3px; flex-direction: column;">
+              <div static style="margin-left: 0px;margin-top: 0px;height: 60px;">
+                <text class="calbtn66" for="{{item in keys['sign_jp'][0]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 32px;margin-top: -5px;height: 60px;">
+                <text class="calbtn66" for="{{item in keys['sign_jp'][1]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 64px;margin-top: -5px;height: 60px;">
+                <text class="calbtn66" for="{{item in keys['sign_jp'][2]}}" @click="onSelect(item)">{{item}}</text>
               </div>
             </div>
           </scroll>
@@ -260,11 +271,12 @@
           </scroll>
           <img show="{{resultList.length > 0}}" style="position: absolute;left: 120px;top: 57px;width: 60px;height: 40px;" src="./assets/arc/down2.png" @click="onBtnClick('down')" />
           <!-- 带变量的相对路径在 aiot-tookit 2.0.4 中修复 -->
-          <img src="./assets/arc/{{lang}}.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('lang')" show="{{downFlag==='' && !numFlag}}" />
-          <img src="./assets/arc/back2.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('switchCn')" show="{{numFlag && lang==='cn'}}" />
+          <img src="./assets/arc/{{lang}}.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('lang')" show="{{downFlag==='' && !numFlag && !numFlag_jp}}" />
+          <img src="./assets/arc/back2.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('switchCn')" show="{{numFlag && lang==='cn' ||numFlag_jp && lang==='jp' }}" />
           <img src="./assets/arc/123.png" style="position: absolute;left: 70px;top: 0px;width: 52px;height: 42px;" @click="onBtnClick('switchNum')" show="{{downFlag==='' && !numFlag && lang==='cn'}}" />
-          <img src="./assets/arc/bigA.png" style="position: absolute;top:0px;left:72px;width:48px;height:42px;" @click="onBtnClick('switchLow')" show="{{downFlag==='' && upperFlag && lang==='en'}}" />
-          <img src="./assets/arc/a.png" style="position: absolute;top:0px;left:72px;width:48px;height:42px;" @click="onBtnClick('switchUpper')" show="{{downFlag==='' && !upperFlag && lang==='en'}}" />
+          <img src="./assets/arc/123.png" style="position: absolute;left: 70px;top: 0px;width: 52px;height: 42px;" @click="onBtnClick('switchNum_jp')" show="{{downFlag==='' && !numFlag_jp && lang==='jp'}}" />
+          <img src="./assets/arc/bigA.png" style="position: absolute;top:0px;left:72px;width:48px;height:42px;" @click="onBtnClick('switchLow')" show="{{downFlag==='' && upperFlag && lang==='en' }}" />
+          <img src="./assets/arc/a.png" style="position: absolute;top:0px;left:72px;width:48px;height:42px;" @click="onBtnClick('switchUpper')" show="{{downFlag==='' && !upperFlag && lang==='en' }}" />
           <img src="./assets/arc/del.png" style="position: absolute;left: 135px;top: 0px;width: 48px;height: 42px;" @click="onBtnClick('D')" />
         </div>
         <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
@@ -289,14 +301,29 @@
 import vibrator from "@system.vibrator";
 import device from '@system.device'
 import { SimpleInputMethod } from "./assets/dicUtil.js";
-function doSearchDic(word, cb) {
-  let hanzi = SimpleInputMethod.getHanzi(word);
-  if (hanzi && hanzi[0]) {
-    cb(hanzi[0]);
-  } else {
+function doSearchDic(word, lang, cb) {
+  let list = [];
+
+  if (!word) {
     cb([]);
+    return;
   }
+
+  if (lang === 'cn') {
+    // 中文模式：走原有的拼音查汉字
+    const res = SimpleInputMethod.getHanzi(word);
+    list = Array.isArray(res) && res[0] ? res[0] : [];
+  }
+  else if (lang === 'jp') {
+    // 日文模式：只查罗马拼音→假名+汉字
+    const raw = SimpleInputMethod.dict.romaji2kanji[word] || '';
+    list = raw ? raw.split('') : [];
+  }
+  // else if (lang === 'en') { /* 英文模式：暂不候选 */ }
+
+  cb(list);
 }
+
 function deleteLast(t) {
   if (t) {
     return t.substr(0, t.length - 1);
@@ -331,6 +358,7 @@ export default {
     downFlag: "",
     lang: "cn",
     numFlag: false,
+    numFlag_jp:false,
     upperFlag: false,
     cvalList: [0, 1, 2, 3, 4],
     percent67: 52,
@@ -349,20 +377,10 @@ export default {
         ["~", "!", "@", "#", "%", "“", "”", "*", "?", "/"],
         ["(", ")", "-", "_", ":", ";", "，", "。", "."],
       ],
-      sign62: [
-        ["2", "3", "4", "5", "6", "7", "8", "9"],
-        ["!", "@", "#", "%", "“", "”", "*"],
-        [")", "-", "_", ":", ";"],
-      ],
-      full62: [
-        ["W", "E", "R", "T", "Y", "U", "I", "O"],
-        ["S", "D", "F", "G", "H", "J", "K"],
-        ["X", "C", "V", "B", "N"],
-      ],
-      t9: [
-        ["abc", "def"],
-        ["ghi", "jkl", "mno"],
-        ["pqrs", "tuv", "wxyz"],
+      sign_jp: [
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+        ["~", "•", "@", "#", "%", "「", "」", "*", "?", "/"],
+        ["(", ")", "-", "…", ":", ";", "、", "。", "!"],
       ],
     },
   },
@@ -379,6 +397,7 @@ export default {
     }
     this.$watch("hide", "watchHidePropsChange");
     this.$watch("maxlength", "watchMaxLengthPropsChange");
+    console.log(this.lang)
   },
   addAllTxt(txt) {
     this.$emit("complete", { content: txt });
@@ -402,6 +421,8 @@ export default {
       case "lang":
         if (this.lang === "cn") {
           this.lang = "en";
+        } else if (this.lang === "en") {
+          this.lang = "jp";
         } else {
           this.lang = "cn";
         }
@@ -428,7 +449,7 @@ export default {
         break;
       case "select":
         if (this.lastWaitingStr != sign && this.lastWaitingStr) {
-          if (this.lang === "cn") {
+          if (this.lang === "cn" || this.lang === 'jp') {
             this.cval += this.waitingList[this.waitingIndex];
           } else {
             if (this.upperFlag) {
@@ -442,13 +463,23 @@ export default {
         }
         break;
       case "switchNum":
+        console.log("cncn");
         this.numFlag = true;
+        this.cval = "";
+        this.clearWaiting();
+        this.resetReslutList();
+        break;
+      case "switchNum_jp":
+        console.log("jpjp");
+        this.numFlag = true;
+        this.numFlag_jp = true;
         this.cval = "";
         this.clearWaiting();
         this.resetReslutList();
         break;
       case "switchCn":
         this.numFlag = false;
+        this.numFlag_jp = false
         break;
       case "switchUpper":
         this.upperFlag = true;
@@ -467,7 +498,7 @@ export default {
                 this.waitingIndex = 0;
               }
             } else {
-              if (this.lang === "cn") {
+              if (this.lang === "cn" || this.lang === 'jp') {
                 this.cval += this.waitingList[this.waitingIndex];
               } else {
                 if (this.upperFlag) {
@@ -493,6 +524,7 @@ export default {
         }
         break;
     }
+    console.log(this.lang)
   },
   clearWaiting() {
     this.waitingList = [];
@@ -500,23 +532,18 @@ export default {
     this.lastWaitingStr = "";
   },
   resetReslutList() {
-    if (this.screentype != "circle") {
-      this.$element("cvalWaiting").scrollTo({
-        top: 0,
-        left: 0,
-        behavior: "smooth",
-      });
-    }
     let watingStr = "";
     if (this.lastWaitingStr && this.lastWaitingStr[this.waitingIndex]) {
       watingStr = this.lastWaitingStr[this.waitingIndex];
     }
-    if (!(this.cval + watingStr) || this.lang != "cn") {
+    if (!(this.cval + watingStr) || this.lang != "cn" && this.lang !== "jp") {
       this.resultList = [];
       this.setResultListAll();
       return;
     }
-    this.getResultByWord(this.cval + watingStr);
+    if (this.lang === 'cn' || this.lang === 'jp') {
+    this.getResultByWord(this.cval + watingStr); // 复用同一函数即可
+    }
   },
   setResultListAll() {
     this.resultList2 = [];
@@ -534,19 +561,15 @@ export default {
   },
   getResultByWord(val) {
     const that = this;
-    doSearchDic(val, function (data) {
+    doSearchDic(val, that.lang, function (data) {
       that.resultList = data;
       that.setResultListAll();
     });
   },
   onSelect(num) {
     this.$emit("keyDown", { content: num });
-    if (this.keyboardtype === "T9" && this.screentype !== "pill-shaped") {
-      this.onBtnClick(num);
-      return;
-    }
     this.onVibrate();
-    if (this.lang === "cn" && !this.numFlag) {
+    if ((this.lang === 'cn' || this.lang === 'jp')  && !this.numFlag) {
       this.cval += num.toLowerCase();
     } else if (this.lang === "en" && !this.numFlag) {
       if (this.upperFlag) {
@@ -760,30 +783,5 @@ export default {
 	width:36px;
 	height:40px;
 	text-align: center;
-}
-
-.keyboard-rows-rect-t9 { 
-  align-items: center;
-  justify-content: space-between;
-  flex-direction: row;
-  flex-shrink: 0;
-  height: 55px;
-  width: 100%;
-}
-
-.calbtnt9-rect { 
-  flex:1;
-  height: 55px;
-  margin: 0 3px;
-  width: unset;
-}
-
-/* 这里判断一个圆表屏幕是否在460~470px之间（目前只有466px），是的话就缩放 */
-@media (min-width: 230) and (max-width: 235) and (shape: circle) {
-  #full-keyboard {
-    transform: scale(0.96);
-    transform-origin: 0 321px;
-    overflow: visible;
-  }
 }
 </style>
