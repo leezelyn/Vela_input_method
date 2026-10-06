@@ -25,8 +25,10 @@ for (const letter of metadata.letters) {
 assert.ok(packedBytes <= Buffer.byteLength(originalJSON) * 0.81,
   'Japanese resource should use at least 19% less storage than the original JSON');
 
-const { createJapaneseDictionary } = loadModule(path.join(root, 'components/InputMethod/assets/japaneseDictionary.js'));
-const { getJapaneseCandidates } = loadModule(path.join(root, 'components/InputMethod/assets/japaneseInput.js'));
+const { createJapaneseDictionary } = loadModule(path.join(root, 'components/InputMethod/assets/dictionaryLoader.js'), {
+  '@system.file': { default: {} }
+});
+const { getJapaneseCandidates } = loadModule(path.join(root, 'components/InputMethod/assets/dicUtil.js'));
 for (const letter of metadata.letters) {
   readers[letter] = createJapaneseDictionary(fs.readFileSync(path.join(path.dirname(resource), 'jp-' + letter + '.txt'), 'utf8'));
   assert.ok(readers[letter].indexBytes <= 350, 'Only a small per-letter index is needed at runtime');

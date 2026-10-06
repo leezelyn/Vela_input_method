@@ -18,7 +18,9 @@ for (const [file, name] of Object.entries(names)) {
 }
 const createEngine = vm.runInNewContext(strip(fs.readFileSync('components/InputMethod/assets/dicUtil.js', 'utf8')) + '\ncreateInputMethod');
 const { loadModule } = require('./helpers/load-module.cjs');
-const { createJapaneseDictionary } = loadModule(require('node:path').resolve('components/InputMethod/assets/japaneseDictionary.js'));
+const { createJapaneseDictionary } = loadModule(require('node:path').resolve('components/InputMethod/assets/dictionaryLoader.js'), {
+  '@system.file': { default: {} }
+});
 const engine = createEngine();
 const base = 'components/InputMethod/assets/dictionary/';
 engine.initDict(JSON.parse(fs.readFileSync(base + 'cn.txt')));
