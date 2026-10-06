@@ -17,7 +17,21 @@ const syllables = read('pinyin_syllables.js', 'syllables');
 const words = read('dic_words.js', 'getWords()');
 const initials = read('dic_words_initials.js', 'getInitialsIndex()');
 write('cn', { chars, syllables });
-write('jp', read('dic_jp.js', 'getDictJp()'));
+const japanese = read('dic_jp.js', 'getDictJp()');
+// ASCII-sorted readings permit binary lookup without expanding a JSON object.
+// Stable deduplication removes repeated candidates without changing their order.
+const jpLetters = [...new Set(Object.keys(japanese).map(key => key[0]))].sort().join('');
+write('jp', { format: 'VIMJP-SHARDS1', letters: jpLetters });
+const jpShards = {};
+for (const letter of jpLetters) jpShards[letter] = [];
+for (const key of Object.keys(japanese).sort()) {
+  const value = [...new Set(japanese[key])].join('');
+  if (!/^[a-z]+$/.test(key) || !value || /[\t\r\n]/.test(value)) throw Error('Invalid Japanese entry');
+  jpShards[key[0]].push(key + '\t' + value + '\n');
+}
+for (const letter of jpLetters) {
+  fs.writeFileSync(path.join(output, 'jp-' + letter + '.txt'), 'VIMJP1\n' + jpShards[letter].join(''));
+}
 for (const letter of 'abcdefghijklmnopqrstuvwxyz') {
   const shard = { words: {}, initials: {}, forward: {} };
   for (const key of Object.keys(words)) {
@@ -41,4 +55,4 @@ for (const letter of 'abcdefghijklmnopqrstuvwxyz') {
   }
   write('words-' + letter, shard);
 }
-console.log('Generated Chinese, Japanese and 26 word shards.');
+console.log('Generated Chinese resources, ' + jpLetters.length + ' compact Japanese shards and 26 Chinese word shards.');

@@ -1,5 +1,7 @@
 import file from '@system.file'
 import { createInputMethod } from './dicUtil.js'
+import { getJapaneseCandidates } from './japaneseInput.js'
+import { createJapaneseDictionary } from './japaneseDictionary.js'
 
 const DEFAULT_ROOT = '/components/InputMethod/assets/dictionary/'
 
@@ -27,7 +29,15 @@ function createDictionaryLoader(root = DEFAULT_ROOT, readText = options => file.
     }
     let resource = ''
     if (language === 'jp') {
-      if (!engine.dict.romaji2kanji) resource = 'jp'
+      if (typeof engine.dict.jpShardLetters === 'string') {
+        const letter = request.word[0].toLowerCase()
+        if (engine.dict.jpShardLetter !== letter) {
+          // All Japanese prefix candidates start with this letter: keep only one shard.
+          delete engine.dict.romaji2kanji
+          engine.dict.jpShardLetter = letter
+        }
+        if (engine.dict.jpShardLetters.indexOf(letter) !== -1 && !engine.dict.romaji2kanji) resource = 'jp-' + letter
+      } else if (!engine.dict.romaji2kanji) resource = 'jp'
     } else if (!engine.dict.syllableSet) {
       resource = 'cn'
     } else {
@@ -42,8 +52,10 @@ function createDictionaryLoader(root = DEFAULT_ROOT, readText = options => file.
     }
     if (!resource) {
       pending = null
-      request.callback(engine.getHanzi(request.word, language),
-        language === 'cn' ? engine.getSegmentedDisplay(request.word) : request.word)
+      if (language === 'jp') {
+        const data = getJapaneseCandidates(request.word, engine.dict.romaji2kanji || {})
+        request.callback(data, data.display)
+      } else request.callback(engine.getHanzi(request.word, language), engine.getSegmentedDisplay(request.word))
       return
     }
     reading = true
@@ -56,12 +68,30 @@ function createDictionaryLoader(root = DEFAULT_ROOT, readText = options => file.
         pump()
         return
       }
+      if (resource.indexOf('jp-') === 0 && resource.slice(-1) !== (pending.word[0] || '').toLowerCase()) {
+        // A new first letter superseded this read; do not allocate its obsolete index.
+        pump()
+        return
+      }
       if (!error) {
         try {
-          const parsed = JSON.parse(data.text)
-          if (resource === 'cn') engine.initDict(parsed)
-          else if (resource === 'jp') engine.dict.romaji2kanji = parsed
-          else engine.installShard(resource.slice(-1), parsed)
+          if (resource === 'jp') {
+            const metadata = /^\s*\{/.test(data.text) ? JSON.parse(data.text) : null
+            if (metadata && metadata.format === 'VIMJP-SHARDS1') {
+              const letters = metadata.letters
+              if (typeof letters !== 'string' || !/^[a-z]*$/.test(letters) ||
+                letters.split('').sort().filter((letter, index, all) => all.indexOf(letter) === index).join('') !== letters) {
+                throw new Error('Invalid Japanese shard metadata')
+              }
+              engine.dict.jpShardLetters = letters
+            } else engine.dict.romaji2kanji = createJapaneseDictionary(data.text)
+          }
+          else if (resource.indexOf('jp-') === 0) engine.dict.romaji2kanji = createJapaneseDictionary(data.text)
+          else {
+            const parsed = JSON.parse(data.text)
+            if (resource === 'cn') engine.initDict(parsed)
+            else engine.installShard(resource.slice(-1), parsed)
+          }
         } catch (failure) { error = failure }
       }
       if (error) {

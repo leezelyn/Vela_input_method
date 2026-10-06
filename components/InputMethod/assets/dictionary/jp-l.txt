@@ -1,0 +1,9 @@
+VIMJP1
+la	ぁァ
+le	ぇェ
+li	ぃィ
+lo	ぉォ
+lu	ぅゥ
+lya	ゃャ
+lyo	ょョ
+lyu	ゅュ

@@ -86,8 +86,8 @@ SimpleInputMethod.getSingleHanzi = function(pinyin, lang = 'cn') {
     || ''
   }
   else if (lang === 'jp') {
-    return (this.dict.romaji2kanji || {})[pinyin]
-    || ''
+    const japanese = this.dict.romaji2kanji || {}
+    return (typeof japanese.get === 'function' ? japanese.get(pinyin) : japanese[pinyin]) || ''
   }
   // en 模式不查候选
   return ''
